@@ -6,6 +6,7 @@ import { createStore } from 'redux'
 /*
 	REDUX Setup
 */
+
 function setStateReducer(state = {}, action) {
   switch (action.type) {
 	case 'SET_LIST':
@@ -22,12 +23,12 @@ function setStateReducer(state = {}, action) {
 /*
 	REDUX+ImmutableJS Setup
 */
+
 function setImmutableStateReducer(state = List(), action) {
 	switch (action.type) {
 		case 'SET_LIST':
 			return List(action.val)
 		case 'ADD_ITEM':
-			// console.log('ADD_ITEM: ', action.val)
 			return state.push(action.val)      
 		case 'REMOVE_ITEM':
 			return state.delete(action.val)
@@ -39,10 +40,11 @@ function setImmutableStateReducer(state = List(), action) {
 /*
 	MST Setup
 */
+
 const MSTStore = types.model({
-	list: types.optional(types.array(types.string), []) // this list is snapshottable
+	list: types.optional(types.array(types.string), []) // list is persistable (captured in snapshots)
 	})
-	.volatile(self => ({ // volatile state is observable (same MobX observable)
+	.volatile(self => ({ // volatile is not captured in snapshots but is still observable (same MobX observable)
 		volatileList: []
 	}))
 	.actions(self => ({
@@ -69,6 +71,7 @@ const MSTStore = types.model({
 /* 
 	MobX Setup
 */
+
 class MobxStore {
 	constructor(){
 		this.list = observable([]) 
@@ -92,6 +95,7 @@ const runProfiler = arraySize => {
 	/* 
 		Create stores
 	*/
+
 	const mstStore = MSTStore.create()
 	const reduxStore = createStore(setStateReducer)
 	const reduxImmutableStore = createStore(setImmutableStateReducer)
@@ -100,32 +104,9 @@ const runProfiler = arraySize => {
 	/* 
 		Initialize the store with an array 
 	*/
+	
 	const input = Array.from(Array(arraySize).keys()).map(x => `Item ${x}`)
 	console.group('Initial array creation')
-
-	//plain mutable 
-	console.time("mutable (deep clone)")
-	const mutableList = JSON.parse( JSON.stringify( input ) ) // has restrictions over the data, e.g. no undefined
-	console.timeEnd("mutable (deep clone)")
-
-	//plain immutable
-	console.time("immutable with spread")
-	let plainImmutableList = [...input]
-	console.timeEnd("immutable with spread")
-
-	//ImmutableJS
-	console.time("immutablejs")
-	let immutableList = List(input)
-	console.timeEnd("immutablejs")
-
-	//MST
-	console.time("mst (persistable)")
-	mstStore.setItems(input)
-	console.timeEnd("mst (persistable)")
-
-	console.time("mst (volatile)")
-	mstStore.setVolatileList(input)
-	console.timeEnd("mst (volatile)")
 
 	//MobX
 	console.time("mobx")
@@ -148,37 +129,23 @@ const runProfiler = arraySize => {
 	})
 	console.timeEnd("redux (immutableJS)")
 
+	//MST
+	console.time("mst (persistable)")
+	mstStore.setItems(input)
+	console.timeEnd("mst (persistable)")
+
+	console.time("mst (volatile)")
+	mstStore.setVolatileList(input)
+	console.timeEnd("mst (volatile)")
+
 	console.groupEnd()
 
 	/* 
 		Adding an item
 	*/
+
 	console.group('Adding a new item')
 	const newItem = 'Item NNN'
-
-	//mutable
-	console.time("mutable")
-	mutableList.push(newItem)
-	console.timeEnd("mutable")
-
-	//plain immutable
-	console.time("immutable with spread")
-	plainImmutableList = [...plainImmutableList, newItem]
-	console.timeEnd("immutable with spread")
-
-	//Immutablejs 
-	console.time("immutablejs")
-	immutableList.push(newItem)
-	console.timeEnd("immutablejs")
-
-	//MST
-	console.time("mst (persistable)")
-	mstStore.addItem(newItem)
-	console.timeEnd("mst (persistable)")
-
-	console.time("mst (volatile)")
-	mstStore.addToVolatileList(input)
-	console.timeEnd("mst (volatile)")
 
 	//MobX
 	console.time("mobx")
@@ -200,37 +167,24 @@ const runProfiler = arraySize => {
 		val: newItem
 	})
 	console.timeEnd("redux (immutableJS)")
-	console.groupEnd() //adding new item
-
-	/* 
-		Removing an item 
-	*/
-	let removeIndex = 1000
-	console.group('Removing an item')
-
-	//mutable
-	console.time("mutable")
-	mutableList.splice(removeIndex,1)
-	console.timeEnd("mutable")
-
-	//plain immutable
-	console.time("immutable with spread")
-	let plainImmutableList2 = [...plainImmutableList.slice(0, removeIndex), ...plainImmutableList.slice(removeIndex+1)]
-	console.timeEnd("immutable with spread")
-
-	//Immutablejs 
-	console.time("immutablejs")
-	immutableList.delete(1000)
-	console.timeEnd("immutablejs")
 
 	//MST
 	console.time("mst (persistable)")
-	mstStore.removeItem(removeIndex)
+	mstStore.addItem(newItem)
 	console.timeEnd("mst (persistable)")
 
 	console.time("mst (volatile)")
-	mstStore.removeFromVolatileList(input)
+	mstStore.addToVolatileList(input)
 	console.timeEnd("mst (volatile)")
+	
+	console.groupEnd() //adding new item	
+	
+	/* 
+		Removing an item 
+	*/
+
+	let removeIndex = 1000
+	console.group('Removing an item')
 
 	//MobX
 	console.time("mobx")
@@ -253,17 +207,14 @@ const runProfiler = arraySize => {
 	})
 	console.timeEnd("redux (immutableJS)")
 
-	// console.time("console.log")
-	// console.log(reduxImmutableStore.getState())
-	// console.timeEnd("console.log")
+	//MST
+	console.time("mst (persistable)")
+	mstStore.removeItem(removeIndex)
+	console.timeEnd("mst (persistable)")
 
-	// console.time("console.log")
-	// reduxImmutableStore.getState().toJS()
-	// console.timeEnd("console.log")
-
-	// console.time("getState()")
-	// reduxImmutableStore.getState()
-	// console.timeEnd("getState()")
+	console.time("mst (volatile)")
+	mstStore.removeFromVolatileList(input)
+	console.timeEnd("mst (volatile)")
 
 	console.groupEnd() //removing item
 	console.groupEnd() //profiler 
