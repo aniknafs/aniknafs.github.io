@@ -56,7 +56,9 @@ let snapshotListener = onSnapshot(mstStore, snapshot => {
     // console.log('new snapshot: ', snapshot);
 })
 
-//MobX Setup
+/* 
+    MobX Setup
+*/
 class MobxStore {
     constructor(){
         this.list = observable([]) 
@@ -82,7 +84,7 @@ console.group('Initial array creation')
 
 //plain mutable
 console.time("mutable")
-const mutableList = JSON.parse( JSON.stringify( input ) );
+const mutableList = JSON.parse( JSON.stringify( input ) ); // has restrictions over the data, e.g. no undefined
 console.timeEnd("mutable")
 
 //plain immutable
@@ -209,3 +211,6 @@ console.timeEnd("redux")
 console.groupEnd() //removing item
 console.groupEnd() //array
 
+
+console.group('Working with complex object tree')
+const tree = Array(10000).keys().map(x => `Item ${x}`)
