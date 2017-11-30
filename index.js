@@ -4,213 +4,267 @@ import { List } from 'immutable'
 import { createStore } from 'redux'
 
 /*
-    REDUX Setup
+	REDUX Setup
 */
-function setStateReducer(state = 0, action) {
+function setStateReducer(state = {}, action) {
   switch (action.type) {
-    case 'SET_LIST':
-        return { ...state, list: [...action.val] }
-    case 'ADD_ITEM':
-        return { ...state, list: [...state.list, action.val] }
-    case 'REMOVE_ITEM':
-        return { ...state, list: [...state.list.slice(0, action.val), ...state.list.slice(action.val+1)] }
-    default:
-        return state
+	case 'SET_LIST':
+		return { ...state, list: [...action.val] }
+	case 'ADD_ITEM':
+		return { ...state, list: [...state.list, action.val] }
+	case 'REMOVE_ITEM':
+		return { ...state, list: [...state.list.slice(0, action.val), ...state.list.slice(action.val+1)] }
+	default:
+		return state
   }
 }
-let ReduxStore = createStore(setStateReducer)
-ReduxStore.subscribe( ()=>{
-    // console.log('store', ReduxStore.getState());
-})
+
 /*
-    MST Setup
+	REDUX+ImmutableJS Setup
+*/
+function setImmutableStateReducer(state = List(), action) {
+	switch (action.type) {
+		case 'SET_LIST':
+			return List(action.val)
+		case 'ADD_ITEM':
+			// console.log('ADD_ITEM: ', action.val)
+			return state.push(action.val)      
+		case 'REMOVE_ITEM':
+			return state.delete(action.val)
+		default:
+			return state
+	}
+}
+
+/*
+	MST Setup
 */
 const MSTStore = types.model({
-    list: types.optional(types.array(types.string), []) // this list is snapshottable
-    })
-    .volatile(self => ({ // volatile state is observable (same MobX observable)
-        volatileList: []
-    }))
-    .actions(self => ({
-        setItems(items){
-            self.list = items
-        },
-        addItem(item){
-            self.list.push(item)
-        },
-        removeItem(index){
-            self.list.splice(index, 1)
-        },
-        setVolatileList(value) {
-            self.volatileList = value
-        },
-        addToVolatileList(item){
-            self.volatileList.push(item)
-        },
-        removeFromVolatileList(index){
-            self.volatileList.splice(index, 1)
-        }
-    }))
-const mstStore = MSTStore.create()
-let snapshotListener = onSnapshot(mstStore, snapshot => { 
-    // console.log('new snapshot: ', snapshot);
-})
+	list: types.optional(types.array(types.string), []) // this list is snapshottable
+	})
+	.volatile(self => ({ // volatile state is observable (same MobX observable)
+		volatileList: []
+	}))
+	.actions(self => ({
+		setItems(items){
+			self.list = items
+		},
+		addItem(item){
+			self.list.push(item)
+		},
+		removeItem(index){
+			self.list.splice(index, 1)
+		},
+		setVolatileList(value) {
+			self.volatileList = value
+		},
+		addToVolatileList(item){
+			self.volatileList.push(item)
+		},
+		removeFromVolatileList(index){
+			self.volatileList.splice(index, 1)
+		}
+	}))
 
 /* 
-    MobX Setup
+	MobX Setup
 */
 class MobxStore {
-    constructor(){
-        this.list = observable([]) 
-    }
-    setItems(items){
-        this.list = items
-    }
-    addItem(item){
-        this.list.push(item);
-    }
-    removeItem(index){
-        this.list.splice(index, 1)
-    }
+	constructor(){
+		this.list = observable([]) 
+	}
+	setItems(items){
+		this.list = items
+	}
+	addItem(item){
+		this.list.push(item)
+	}
+	removeItem(index){
+		this.list.splice(index, 1)
+	}
 } 
-const mobxStore = new MobxStore()
 
-/* 
-    Initialize the store with an array 
-*/
-console.group('Working with array')
-const input = Array.from(Array(10000).keys()).map(x => `Item ${x}`)
-console.group('Initial array creation')
+document.getElementById('run').addEventListener('click', () => runProfiler(parseInt(document.getElementById('arraySize').value)))
 
-//plain mutable
-console.time("mutable")
-const mutableList = JSON.parse( JSON.stringify( input ) ); // has restrictions over the data, e.g. no undefined
-console.timeEnd("mutable")
+const runProfiler = arraySize => {
+	console.group(`Running profiler with ${arraySize} elements`)
 
-//plain immutable
-console.time("immutable with spread")
-let plainImmutableList = [...input]
-console.timeEnd("immutable with spread")
+	/* 
+		Create stores
+	*/
+	const mstStore = MSTStore.create()
+	const reduxStore = createStore(setStateReducer)
+	const reduxImmutableStore = createStore(setImmutableStateReducer)
+	const mobxStore = new MobxStore()
+	
+	/* 
+		Initialize the store with an array 
+	*/
+	const input = Array.from(Array(arraySize).keys()).map(x => `Item ${x}`)
+	console.group('Initial array creation')
 
-//ImmutableJS
-console.time("immutablejs")
-const immutableList = List(input);
-console.timeEnd("immutablejs")
+	//plain mutable 
+	console.time("mutable (deep clone)")
+	const mutableList = JSON.parse( JSON.stringify( input ) ) // has restrictions over the data, e.g. no undefined
+	console.timeEnd("mutable (deep clone)")
 
-//MST
-console.time("mst")
-mstStore.setItems(input)
-console.timeEnd("mst")
+	//plain immutable
+	console.time("immutable with spread")
+	let plainImmutableList = [...input]
+	console.timeEnd("immutable with spread")
 
-console.time("mst (volatile)")
-mstStore.setVolatileList(input)
-console.timeEnd("mst (volatile)")
+	//ImmutableJS
+	console.time("immutablejs")
+	let immutableList = List(input)
+	console.timeEnd("immutablejs")
 
-//MobX
-console.time("mobx")
-mobxStore.setItems(input)
-console.timeEnd("mobx")
+	//MST
+	console.time("mst (persistable)")
+	mstStore.setItems(input)
+	console.timeEnd("mst (persistable)")
 
-//REDUX 
-console.time("redux")
-ReduxStore.dispatch({ 
-    type: 'SET_LIST', 
-    val: input 
-})
-console.timeEnd("redux")
+	console.time("mst (volatile)")
+	mstStore.setVolatileList(input)
+	console.timeEnd("mst (volatile)")
 
-console.groupEnd()
+	//MobX
+	console.time("mobx")
+	mobxStore.setItems(input)
+	console.timeEnd("mobx")
 
-/* 
-    Adding an item
-*/
-console.group('Adding a new item')
-const newItem = 'Item NNN'
+	//REDUX 
+	console.time("redux (spread op)")
+	reduxStore.dispatch({ 
+		type: 'SET_LIST', 
+		val: input 
+	})
+	console.timeEnd("redux (spread op)")
 
-//mutable
-console.time("mutable")
-mutableList.push(newItem)
-console.timeEnd("mutable")
+	//REDUX+Immutable
+	console.time("redux (immutableJS)")
+	reduxImmutableStore.dispatch({ 
+		type: 'SET_LIST', 
+		val: input 
+	})
+	console.timeEnd("redux (immutableJS)")
 
-//plain immutable
-console.time("immutable with spread")
-plainImmutableList = [...plainImmutableList, newItem]
-console.timeEnd("immutable with spread")
+	console.groupEnd()
 
-//Immutablejs 
-console.time("immutablejs")
-immutableList.push(newItem)
-console.timeEnd("immutablejs")
+	/* 
+		Adding an item
+	*/
+	console.group('Adding a new item')
+	const newItem = 'Item NNN'
 
-//MST
-console.time("mst")
-mstStore.addItem(newItem)
-console.timeEnd("mst")
+	//mutable
+	console.time("mutable")
+	mutableList.push(newItem)
+	console.timeEnd("mutable")
 
-console.time("mst (volatile)")
-mstStore.addToVolatileList(input)
-console.timeEnd("mst (volatile)")
+	//plain immutable
+	console.time("immutable with spread")
+	plainImmutableList = [...plainImmutableList, newItem]
+	console.timeEnd("immutable with spread")
 
-//MobX
-console.time("mobx")
-mobxStore.addItem(newItem)
-console.timeEnd("mobx")
+	//Immutablejs 
+	console.time("immutablejs")
+	immutableList.push(newItem)
+	console.timeEnd("immutablejs")
 
-//REDUX 
-console.time("redux")
-ReduxStore.dispatch({ 
-    type: 'ADD_ITEM', 
-    val: newItem
-})
-console.timeEnd("redux")
-console.groupEnd() //adding new item
+	//MST
+	console.time("mst (persistable)")
+	mstStore.addItem(newItem)
+	console.timeEnd("mst (persistable)")
 
-/* 
-    Removing an item 
-*/
-let removeIndex = 1000;
-console.group('Removing an item')
+	console.time("mst (volatile)")
+	mstStore.addToVolatileList(input)
+	console.timeEnd("mst (volatile)")
 
-//mutable
-console.time("mutable")
-mutableList.splice(removeIndex,1)
-console.timeEnd("mutable")
+	//MobX
+	console.time("mobx")
+	mobxStore.addItem(newItem)
+	console.timeEnd("mobx")
 
-//plain immutable
-console.time("immutable with spread")
-let plainImmutableList2 = [...plainImmutableList.slice(0, removeIndex), ...plainImmutableList.slice(removeIndex+1)]
-console.timeEnd("immutable with spread")
+	//REDUX 
+	console.time("redux (spread op)")
+	reduxStore.dispatch({ 
+		type: 'ADD_ITEM', 
+		val: newItem
+	})
+	console.timeEnd("redux (spread op)")
 
-//Immutablejs 
-console.time("immutablejs")
-immutableList.delete(1000)
-console.timeEnd("immutablejs")
+	//REDUX+ImmutableJS
+	console.time("redux (immutableJS)")
+	reduxImmutableStore.dispatch({ 
+		type: 'ADD_ITEM', 
+		val: newItem
+	})
+	console.timeEnd("redux (immutableJS)")
+	console.groupEnd() //adding new item
 
-//MST
-console.time("mst")
-mstStore.removeItem(removeIndex)
-console.timeEnd("mst")
+	/* 
+		Removing an item 
+	*/
+	let removeIndex = 1000
+	console.group('Removing an item')
 
-console.time("mst (volatile)")
-mstStore.removeFromVolatileList(input)
-console.timeEnd("mst (volatile)")
+	//mutable
+	console.time("mutable")
+	mutableList.splice(removeIndex,1)
+	console.timeEnd("mutable")
 
-//MobX
-console.time("mobx")
-mobxStore.removeItem(removeIndex)
-console.timeEnd("mobx")
+	//plain immutable
+	console.time("immutable with spread")
+	let plainImmutableList2 = [...plainImmutableList.slice(0, removeIndex), ...plainImmutableList.slice(removeIndex+1)]
+	console.timeEnd("immutable with spread")
 
-//REDUX 
-console.time("redux")
-ReduxStore.dispatch({ 
-    type: 'REMOVE_ITEM', 
-    val: removeIndex
-})
-console.timeEnd("redux")
+	//Immutablejs 
+	console.time("immutablejs")
+	immutableList.delete(1000)
+	console.timeEnd("immutablejs")
 
-console.groupEnd() //removing item
-console.groupEnd() //array
+	//MST
+	console.time("mst (persistable)")
+	mstStore.removeItem(removeIndex)
+	console.timeEnd("mst (persistable)")
 
+	console.time("mst (volatile)")
+	mstStore.removeFromVolatileList(input)
+	console.timeEnd("mst (volatile)")
 
-console.group('Working with complex object tree')
-const tree = Array(10000).keys().map(x => `Item ${x}`)
+	//MobX
+	console.time("mobx")
+	mobxStore.removeItem(removeIndex)
+	console.timeEnd("mobx")
+
+	//REDUX 
+	console.time("redux (spread op)")
+	reduxStore.dispatch({ 
+		type: 'REMOVE_ITEM', 
+		val: removeIndex
+	})
+	console.timeEnd("redux (spread op)")
+
+	//REDUX+ImmutableJS
+	console.time("redux (immutableJS)")
+	reduxImmutableStore.dispatch({ 
+		type: 'REMOVE_ITEM', 
+		val: removeIndex
+	})
+	console.timeEnd("redux (immutableJS)")
+
+	// console.time("console.log")
+	// console.log(reduxImmutableStore.getState())
+	// console.timeEnd("console.log")
+
+	// console.time("console.log")
+	// reduxImmutableStore.getState().toJS()
+	// console.timeEnd("console.log")
+
+	// console.time("getState()")
+	// reduxImmutableStore.getState()
+	// console.timeEnd("getState()")
+
+	console.groupEnd() //removing item
+	console.groupEnd() //profiler 
+}

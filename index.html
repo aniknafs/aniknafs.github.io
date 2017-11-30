@@ -7,10 +7,14 @@
 </head>
 
 <body>
-  <div id='app' />
-
-  <!-- <script src="../../node_modules/react/dist/react.js"></script> -->
-  <!-- <script src="../../node_modules/react-dom/dist/react-dom.js"></script> -->
+  <strong>Array size: </strong>
+  <input id="arraySize" type="text" value="10000"> </input>
+  <button id="run" style="display:inline;">Run profiler (checkout the console)</button>
+  <p>
+    Three state containers are used: Redux, MobX, and MobX-State-Tree(MST) </br> 
+    Redux reducers are implemented once using a helper (ImmutableJS) and once without a helper (using spread op) </br> 
+    MST also compares both persistable and volatile states
+  </p>
   <script src="./bundle.js"></script>  
 </body>
 
